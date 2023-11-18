@@ -4,12 +4,12 @@ function doanalysis()
     function change(df)
     	name=names(df)
    		listTime = ["time", "Tmid", "T0", "t-T0", "t-to","Tmid-T0  ","t-T0,d"]
-    	listMag = ["mag", "Magnitude", "OT", "magn"]
-    	listLimit=["UL(3sigma)","UL(3 sigma)"]
-		listDate=["Date"]
-		listExp=["Exp.","Exp(s)","Exps"," Expt. "]
+    	listMag = ["mag", "Magnitude", "OT", "magn","magnitude","mag,","Mag.","mag."]
+    	listLimit=["UL(3sigma)","UL(3 sigma)","limit","lim","UL."]
+		listDate=["Date","date"]
+		listExp=["Exp.","Exp(s)","Exps"," Expt. ","Exptime"]
 		listMagerr=["Err","Err.","Mag_err"]
-		listFilter=["Filt."]
+		listFilter=["Filt.","filter"]
 		listTele=["          Site       "]
     	for i in 1:length(name)
         	if name[i] in listTime; rename!(df,Dict(name[i]=>"Time"))
@@ -25,15 +25,16 @@ function doanalysis()
     	end
 	end
 	
-       for x in 34000:34200
+       for x in 1:36000
            print("\r peeking at GCN $x ")
            try
-               url = "https://gcn.nasa.gov/circulars/$x.txt"
-               resp = HTTP.get(url) 
-               status=resp.status
-               print(" ",status," "); 
-               if status == 404 ; println("status=",status); continue; end          
-               txt = String(resp.body)
+               #url = "https://gcn.nasa.gov/circulars/$x.txt"
+               #resp = HTTP.get(url) 
+               #status=resp.status
+               #print(" ",status," "); 
+               #if status == 404 ; println("status=",status); continue; end          
+               #txt = String(resp.body)
+                txt=read("/home/raman/Documents/archive/archive.txt/$x.txt", String)
                 grb_rexp=r"GRB ?\d{6}([A-G]|(\.\d{2}))?"
 				m=match(grb_rexp,txt)
 				grb="nogrb"
@@ -61,13 +62,13 @@ function doanalysis()
 					df.System=["Vega" for i in 1:nrow(df)]
 					df.GalExt=["n" for i in 1:nrow(df)]
 					change(df)
-					dframe(df)
+					
 					
                 elseif occursin("report on behalf of the Swift/UVOT team",txt)
                 	println(" SWIFT/UVOT report")
             		hb,he=findfirst(r"^Filter"im,txt)
 					lr,_=findnext("\n\nThe",txt,he)
-					cltxt=replace(txt[hb:lr], r"   +"=>s"|",r" ?\+/?- ?"=>s"|",">"=>"",r"(\s\n)"=>s"\n")
+					cltxt=replace(txt[hb:lr], r"   +"=>s"|",r" ?\+/?- ?"=>s"|",">"=>"",r"(\s\n)"=>s"\n", "�"=>"|")
 					ltxt=txt[lr:end]
 					gal=match(r"(\s+are\s+(not)\s+corrected\s+for\s+(the\s+)?Galactic\s+extinction\s+)",ltxt)
 					gext=gal.captures[2]
@@ -82,7 +83,7 @@ function doanalysis()
 					df.GalExt=[galext for i in 1:nrow(df)]
 					df.Telescope=["SWIFT/UVOT" for i in 1:nrow(df)]
 					change(df)
-			        dframe(df)
+			        
 			        
 			    elseif occursin("GROND", txt)
                 	println(" GROND report") 
@@ -114,6 +115,7 @@ function doanalysis()
 						p=par*60
 					else p=par
 					end
+					tim=ti+(p/2)
 					lr=first(findnext(r"^(((?:[\t ]*(?:\r?\n|\r))+)|(The)|(Given)|(This))"m,txt,he))-1
 					ltxt=txt[lr:end]
 					ys=(collect(eachmatch(r"((Vega)|(Johnson)|(AB)|(SDSS)|(DSS)|(2MASS)|(USNO)|(NOMAD)|(GSC)|(ST))",ptxt)))
@@ -138,14 +140,14 @@ function doanalysis()
 					end
                 	cltxt=replace(txt[he:lr], "mag"=>"",","=>" ",r" ?(=|>|~|<)"=>"|" , r"\+/?-"=>"|","�"=>" ","and"=>"")
                 	df=CSV.read(IOBuffer(cltxt), DataFrame, delim="|" ,header=0)
-					df.Time=[ti for i in 1:nrow(df)]
+					df.Time=[tim for i in 1:nrow(df)]
 					df.Exp=[p for i in 1:nrow(df)]
 					df.System=[syst for i in 1:nrow(df)]
 					df.GalExt=[galex for i in 1:nrow(df)]
 					df.Telescope=["GROND" for i in 1:nrow(df)]
 					rename!(df,"Column1" => "Filter","Column2" => "Mag")
 					if "Column3" in names(df); rename!(df, "Column3" => "MagErr"); end
-                    dframe(df)
+                    
                     
                 elseif occursin("RATIR", txt)
                 	println(" RATIR report") 
@@ -195,12 +197,13 @@ function doanalysis()
                 	cltxt=replace(txt[he-1:lr], r"(mag)|(and)"=>"", r" ?(\+/?-) ?"=>",", r" +(>|=)? *"=>",",r"\n *"=>"\n",r"\t>?=? *"=>",",r" *�* *"=>"")
             		df=CSV.read(IOBuffer(cltxt), DataFrame, delim="," ,header=0)
 					rename!(df,"Column1" => "Filter","Column2" => "Mag")
-					if "Column3" in names(df); rename!(df, "Column3" => "Mag_err"); end
+					if "Column3" in names(df); rename!(df, "Column3" => "MagErr"); end
 					df.Time=[midt for i in 1:nrow(df)]
 					df.Exp=[p for i in 1:nrow(df)]
 					df.System=[syst for i in 1:nrow(df)]
+					df.Telescope=["RATIR" for i in 1:nrow(df)]
 					df.GalExt=[galext for i in 1:nrow(df)]
-					dframe(df)
+					
 				elseif occursin("IKI", txt)
               	  println(" IKI report")                
               		he=first(findfirst(r"^(Date)|(UT start)|(T0+)"m,txt))
@@ -231,7 +234,7 @@ function doanalysis()
 					df.System=[syst for i in 1:nrow(df)]
 					df.GalExt=[galex for i in 1:nrow(df)]
 					change(df)
-					dframe(df)
+					
 				elseif occursin("KAIT", txt)
                     println(" KAIT report")                                
                     t=match(r"(((\d+\.?)(\d{1,5})?)( {1,})?-?\s+(\b((minutes)|(mins?)|m\s)|((seconds?)|(sec)|s\s)|((hours?)|(hrs?))|(days?)\b))(\s*after\s+(\w*\s+)?((burst)|(trigger)))",txt)
@@ -255,14 +258,17 @@ function doanalysis()
 					df.System=["Vega" for i in 1:1]
 					df.Telescope=["KAIT" for i in 1:1]
 					df.Time=[ttwo for i in 1:1]
-               	    dframe(df)
+               	    
                 end # if occursin
+                dframe(df)
+                select!(dfg, :GCN, :GRB, :Telescope, :Mag, :MagErr, :Time, :Exp, "Filter", :Limit,  :System, "      Date Time      ")       
             catch e
-            println("error ")           
+            if isa(e, LoadError); continue; end
             end # trycatch
+            
         end # for loop
         if !isnothing(dfg)
-        	CSV.write("data-all.csv",dfg)
+        	CSV.write("dataall.csv",dfg)
         else
         @info "no dfg to write"
         end # !isnothing

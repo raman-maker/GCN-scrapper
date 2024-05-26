@@ -80,6 +80,7 @@ function doanalysis()
 					df=CSV.read(IOBuffer(cltxt), DataFrame, delim='|')
 					if "Column6" in names(df); rename!(df, :Column6 => :MagErr); end
 					df.Time = (df."T_start(s)" .+ df."T_stop(s)") ./ 2
+					df.System=["AB" for i in 1:nrow(df)]
 					df.GalExt=[galext for i in 1:nrow(df)]
 					df.Telescope=["SWIFT/UVOT" for i in 1:nrow(df)]
 					change(df)
